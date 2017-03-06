@@ -1,0 +1,42 @@
+Deployment manual
+
+Deployment steps
+The deployment steps are fairly straightforward because all you have to do is:
+1. Login to the AWS console and browse to the CloudFormation section
+2. Click on “Create stack” and select “Upload a template to  Amazon S3”
+3. Select the file “aws_ecs.yaml” located in “Code\aws-cloudformation” and hit “Next”
+4. Leave all the parameters with default values (You’ll find an explanation of what they do below)
+5. Hit “Next” and “Next” again
+6. Scroll down and tick the “I acknowledge that AWS CloudFormation might create IAM resources.”  box (very important)
+7. Click “Create”
+8. After the stack has finished creating, go to the “Output” tab and click on the ElbURL
+
+Parameter explanation
+1. EcsInstanceType = The instance type to be used as a template for all ECS created hosts
+2. KeyName = The key to use to SSH into the hosts
+3. VpcCidr = The VPC Cidr block of the newly created VPC
+4. SubnetCidr1 and SubnetCidr2 = The Subnet Cidr block of 2 subnets that will be part of the VPC
+5. AsgMinSize and AsgMaxSize = The min/max amount of instances to maintain in ASG
+6. InitialECSServiceTaskCount = The initial desired amount of tasks to run for the launched service
+7. SourceCidr = The Cidr of allowed IPs to SSH into the bashton host
+8. DBClass = The instance type to be used for the RDS db
+9. DBAllocatedStorage = Amount of storage to assign to the DB
+10. DBName, DBUsername and DBPassword = self-explanatory
+11. MultiAZ = The type of RDS (multiAz or singleAz)
+12. ContainerImage = PREDEPLOYED container image that is used in stack creation
+13. AutoScalingPolicy = Policy ARN to be used for Service autoscaling
+14. ECSServiceRolePolicy and ECSServiceRole = Policy ARN to be used for Services
+15. ContainerMemoryHardLimit = Hard memory limit for container
+16. ContainerMemorySoftLimit = Soft memory limit for container
+17. CPUUnitReservation = The minimum number of CPU units to reserve for the container
+18. WebsiteURL = The end website URL
+
+
+Notes
+1. If defined ContainerMemoryHardLimit is smaller than ContainerMemoryHardLimit, the stack creation will fail
+2. The policy ARNs are predeployed in the environment and a sample of how they look exactly can be found in Code\Policies
+3. The container image has been predeployed based on the Dockerfile that can be found in Code\application
+4. If the VPC Cidr and Subnet Cidr do not match, the stack will fail
+5. The stack MUST BE DEPLOYED in any of the following regions [us-west-2,us-east-1,eu-west-1] as per https://aws.amazon.com/blogs/aws/amazon-elastic-file-system-production-ready-in-three-regions/
+
+

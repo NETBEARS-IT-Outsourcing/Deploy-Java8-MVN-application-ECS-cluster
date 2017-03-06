@@ -1,0 +1,764 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+Mappings:
+  AWSRegionToAMI:
+    us-east-1:
+      AMIID: ami-b2df2ca4
+    us-east-2:
+      AMIID: ami-832b0ee6
+    us-west-1:
+      AMIID: ami-dd104dbd
+    us-west-2:
+      AMIID: ami-022b9262
+
+Parameters:
+  EcsInstanceType:
+    Type: String
+    Description: ECS EC2 instance type
+    Default: t2.medium
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - t2.large
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+    - m4.large
+    - m4.xlarge
+    - m4.2xlarge
+    - m4.4xlarge
+    - m4.10xlarge
+    - c4.large
+    - c4.xlarge
+    - c4.2xlarge
+    - c4.4xlarge
+    - c4.8xlarge
+    - c3.large
+    - c3.xlarge
+    - c3.2xlarge
+    - c3.4xlarge
+    - c3.8xlarge
+    - r3.large
+    - r3.xlarge
+    - r3.2xlarge
+    - r3.4xlarge
+    - r3.8xlarge
+    - i2.xlarge
+    - i2.2xlarge
+    - i2.4xlarge
+    - i2.8xlarge
+    - g2.2xlarge
+    - g2.8xlarge
+    - d2.xlarge
+    - d2.2xlarge
+    - d2.4xlarge
+    - d2.8xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances
+    Default: mariusmitrofan
+  VpcCidr:
+    Type: String
+    Description: Specifies the CIDR block of the VPC
+    Default: '10.0.0.0/16'
+  SubnetCidr1:
+    Type: String
+    Description: Specifies the CIDR Block of Subnet 1
+    Default: '10.0.0.0/24'
+  SubnetCidr2:
+    Type: String
+    Description: Specifies the CIDR Block of Subnet 2
+    Default: '10.0.1.0/24'
+  AsgMinSize:
+    Type: Number
+    Description: Maximum size and initial Desired Capacity of ECS Auto Scaling Group
+    Default: 1
+  AsgMaxSize:
+    Type: Number
+    Description: Maximum size and initial Desired Capacity of ECS Auto Scaling Group
+    Default: 5
+  InitialECSServiceTaskCount:
+    Type: Number
+    Description: The initial number of tasks to run for this service
+    Default: 2
+  SourceCidr:
+    Type: String
+    Description: Required - CIDR/IP range for Bashton EC2 instance - defaults to 0.0.0.0/0
+    Default: 0.0.0.0/0
+  DBClass:
+    Description: Database instance class
+    Type: String
+    Default: db.t2.small
+    AllowedValues:
+    - db.t2.micro
+    - db.t2.small
+    - db.t2.medium
+    - db.t2.large
+    - db.m1.small
+    - db.m1.medium
+    - db.m1.large
+    - db.m1.xlarge
+    - db.m2.xlarge
+    - db.m2.2xlarge
+    - db.m2.4xlarge
+    - db.m3.medium
+    - db.m3.large
+    - db.m3.xlarge
+    - db.m3.2xlarge
+    - db.m4.large
+    - db.m4.xlarge
+    - db.m4.2xlarge
+    - db.m4.4xlarge
+    - db.m4.10xlarge
+    - db.r3.large
+    - db.r3.xlarge
+    - db.r3.2xlarge
+    - db.r3.4xlarge
+    - db.r3.8xlarge
+    - db.m2.xlarge
+    - db.m2.2xlarge
+    - db.m2.4xlarge
+    - db.cr1.8xlarge
+    ConstraintDescription: must select a valid database instance type.
+  DBAllocatedStorage:
+    Default: '5'
+    Description: The size of the database (Gb)
+    Type: Number
+    MinValue: '5'
+    MaxValue: '1024'
+    ConstraintDescription: must be between 5 and 1024Gb.
+  DBName:
+    Type: String
+    Description: The name for the app database.
+    MinLength: '4'
+    MaxLength: '20'
+    Default: DBName
+    AllowedPattern: "^[a-zA-Z0-9_]+$"
+    ConstraintDescription: Must be a valid database name!
+  DBUsername:
+    Type: String
+    Description: The username for the app database.
+    MinLength: '5'
+    MaxLength: '20'
+    Default: DBUsername
+    AllowedPattern: "^[a-zA-Z0-9_]+$"
+    ConstraintDescription: Must be a valid database username string!
+  DBPassword:
+    Type: String
+    Default: DBPassword
+    Description: The password for the app database.
+    NoEcho: true
+    MinLength: '8'
+    MaxLength: '64'
+    ConstraintDescription: Must be a valid database password (length [8 - 64] characters)!
+  MultiAZ:
+    Type: String
+    Default: true
+    AllowedValues:
+    - false
+    - true
+  ContainerImage:
+    Type: String
+    Default: 681334690172.dkr.ecr.us-west-2.amazonaws.com/crossover/journal:latest
+    Description: Container image in format RepoURL:ImageTag 
+  AutoScalingPolicy:
+    Type: String
+    Description: Policy to use for service scalable target
+    Default: arn:aws:iam::681334690172:policy/ApplicationAutoScaling
+  ECSServiceRolePolicy:
+    Type: String
+    Description: Policy to use for EC2 instances
+    Default: arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+  ECSServiceRole:
+    Type: String
+    Description: Policy to use for ECS services
+    Default: arn:aws:iam::681334690172:role/ecsServiceRole
+  ContainerMemoryHardLimit:
+    Type: Number
+    Description: Hard memory limit for container. If your container attempts to exceed the allocated memory, the container is terminated.
+    Default: 1024
+  ContainerMemorySoftLimit:
+    Type: Number
+    Description: Soft memory limit for container. When system memory is under contention, Docker attempts to keep the container memory within the limit. 
+    Default: 512
+  CPUUnitReservation:
+    Type: Number
+    Description: The minimum number of CPU units to reserve for the container. Containers share unallocated CPU units with other containers on the instance by using the same ratio as their allocated CPU units.
+    Default: 1024
+  WebsiteURL:
+    Type: String
+    Description: The end website URL
+    Default: journal.crossover.com
+
+
+
+Conditions:
+  Is-EC2-VPC:
+    Fn::Or:
+    - Fn::Equals:
+      - Ref: AWS::Region
+      - eu-central-1
+    - Fn::Equals:
+      - Ref: AWS::Region
+      - cn-north-1
+    - Fn::Equals:
+      - Ref: AWS::Region
+      - ap-northeast-2
+  Is-EC2-Classic:
+    Fn::Not:
+    - Condition: Is-EC2-VPC
+
+Resources:
+  Vpc:    
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+
+  PubSubnetAz1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr1
+      AvailabilityZone:
+        Fn::Join:
+          - ''
+          - - Ref: AWS::Region
+            - 'a'
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+
+  PubSubnetAz2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr2
+      AvailabilityZone:
+        Fn::Join:
+          - ''
+          - - Ref: AWS::Region
+            - 'b'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteViaIgw:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  PublicRouteViaIgw:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteViaIgw
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PubSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSubnetAz1
+      RouteTableId: !Ref RouteViaIgw
+
+  PubSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSubnetAz2
+      RouteTableId: !Ref RouteViaIgw
+
+  BashtonEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bashton Allowed Ports
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref SourceCidr
+
+  LoadBalancerEcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LoadBalancer Allowed Ports
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn:
+      - EcsSecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: Open database for access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        SourceSecurityGroupId: !Ref EcsSecurityGroup
+
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        SourceSecurityGroupId: !Ref LoadBalancerEcsSecurityGroup
+      - IpProtocol: "tcp"
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !Ref BashtonEC2SecurityGroup
+
+  EcsInstancePolicy:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+      - Ref: ECSServiceRolePolicy
+
+  EcsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: EcsInstancePolicy
+  
+  FileSystem:
+    Type: "AWS::EFS::FileSystem"
+    Properties:
+      PerformanceMode: generalPurpose
+
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      SubnetId:
+        Ref: PubSubnetAz1
+      SecurityGroups: 
+      - !GetAtt EcsSecurityGroup.GroupId
+
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      SubnetId:
+        Ref: PubSubnetAz2
+      SecurityGroups: 
+      - !GetAtt EcsSecurityGroup.GroupId
+
+  BashtonEc2Instance: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId:
+        Fn::FindInMap:
+          - AWSRegionToAMI
+          - Ref: AWS::Region
+          - AMIID
+      KeyName: 
+        Ref: KeyName
+      InstanceType:
+        Ref: EcsInstanceType
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: 
+            - Ref: BashtonEC2SecurityGroup
+          SubnetId: 
+            Ref: PubSubnetAz1
+
+  EcsInstanceLc:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    DependsOn:
+      - FileSystem
+      - MountTarget1
+      - MountTarget2
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+          - AWSRegionToAMI
+          - Ref: AWS::Region
+          - AMIID
+      InstanceType:
+        Ref: EcsInstanceType
+      IamInstanceProfile:
+        Ref: EcsInstanceProfile
+      KeyName:
+        Ref: KeyName
+      AssociatePublicIpAddress: true
+      SecurityGroups:
+      - !GetAtt EcsSecurityGroup.GroupId
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#cloud-config\n"
+            - 'write_files:
+
+'
+            - "  - path: /etc/ecs/ecs.config\n"
+            - "    content: |\n"
+            - "      ECS_CLUSTER="
+            - Ref: EcsCluster
+            - "\n"
+            - '      ECS_AVAILABLE_LOGGING_DRIVERS=["json-file","gelf"]
+
+'
+            - 'runcmd:
+
+'
+            - "  - [ mkdir, -p, /media/efs-mount-point ]\n"
+            - "  - [ sh, -xc, 'echo \""
+            - Ref: FileSystem
+            - ".efs."
+            - Ref: AWS::Region
+            - ".amazonaws.com:/ /media/efs-mount-point nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0\"  >> /etc/fstab' ]\n"
+            - "  - [ sh, -xc, 'mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 "
+            - Ref: FileSystem
+            - ".efs."
+            - Ref: AWS::Region
+            - ".amazonaws.com:/ /media/efs-mount-point' ]\n"
+            - "  - [stop,ecs]\n"
+            - "  - [service, docker, restart] \n"
+            - "  - [start, ecs]\n"
+            - 'packages:
+
+'
+            - "  - aws-cli\n"
+            - "  - htop\n"
+            - "  - nfs-utils\n"
+            - "  - jq\n"
+            - "  - tmux\n"
+
+  EcsInstanceAsg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+      - Ref: PubSubnetAz1
+      - Ref: PubSubnetAz2
+      LaunchConfigurationName:
+        Ref: EcsInstanceLc
+      MinSize: 
+        Ref: AsgMinSize
+      MaxSize: 
+        Ref: AsgMaxSize
+      DesiredCapacity:
+        Ref: AsgMinSize
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'ECS Instance - '
+            - Ref: AWS::StackName
+        PropagateAtLaunch: 'true'
+
+  DBSubnetGroup: 
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: "DB Subnet Group"
+      SubnetIds: 
+        - Ref: PubSubnetAz1
+        - Ref: PubSubnetAz2
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName:
+        Ref: DBName
+      Engine: MySQL
+      MultiAZ: !Ref MultiAZ
+      MasterUsername:
+        Ref: DBUsername
+      MasterUserPassword:
+        Ref: DBPassword
+      DBInstanceClass:
+        Ref: DBClass
+      AllocatedStorage:
+        Ref: DBAllocatedStorage
+      DBSubnetGroupName:
+        Ref: DBSubnetGroup
+      VPCSecurityGroups: 
+        - !GetAtt DBEC2SecurityGroup.GroupId
+
+  ScaleUpPolicyAsg:
+    Type: AWS::AutoScaling::ScalingPolicy
+    DependsOn:
+      - EcsInstanceAsg
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref EcsInstanceAsg
+      Cooldown: '60'
+      ScalingAdjustment: 1
+
+  ScaleDownPolicyAsg:
+    Type: AWS::AutoScaling::ScalingPolicy
+    DependsOn:
+      - EcsInstanceAsg
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref EcsInstanceAsg
+      Cooldown: '60'
+      ScalingAdjustment: -1
+
+  ApplicationScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - application-autoscaling.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AutoScalingPolicy
+
+  CPUAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - ScaleUpPolicyAsg
+      - ServiceScaleUpPolicyapp
+    Properties:
+      EvaluationPeriods: 2
+      Statistic: Average
+      Threshold: 70
+      AlarmDescription: Alarm if CPU too high
+      Period: 60
+      AlarmActions:
+      - Ref: ScaleUpPolicyAsg
+      - Ref: ServiceScaleUpPolicyapp
+      Namespace: AWS/EC2
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref EcsInstanceAsg
+      ComparisonOperator: GreaterThanThreshold
+      MetricName: CPUUtilization
+
+  CPUAlarmLow:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - ScaleDownPolicyAsg
+      - ServiceScaleDownPolicyapp
+    Properties:
+      EvaluationPeriods: 2
+      Statistic: Average
+      Threshold: 30
+      AlarmDescription: Alarm if CPU too low
+      Period: 60
+      AlarmActions:
+      - Ref: ScaleDownPolicyAsg
+      - Ref: ServiceScaleDownPolicyapp
+      Namespace: AWS/EC2
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref EcsInstanceAsg
+      ComparisonOperator: LessThanThreshold
+      MetricName: CPUUtilization
+
+  AppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Name: app
+        Image: !Ref ContainerImage
+        Environment:
+        - Name: DB_HOST
+          Value: !GetAtt DBInstance.Endpoint.Address
+        - Name: DB_PASSWORD
+          Value: !Ref DBPassword
+        - Name: DB_USERNAME
+          Value: !Ref DBUsername
+        Memory: !Ref ContainerMemoryHardLimit
+        MemoryReservation: !Ref ContainerMemorySoftLimit
+        Cpu: !Ref CPUUnitReservation
+        MountPoints:
+        - ContainerPath: /app_data
+          SourceVolume: uploads
+        PortMappings:
+        - ContainerPort: 8080
+          HostPort: 0
+      Volumes:
+      - Name: uploads
+        Host:
+          SourcePath: /media/efs-mount-point
+
+  EcsElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+      - Ref: PubSubnetAz1
+      - Ref: PubSubnetAz2
+      SecurityGroups:
+      - !GetAtt LoadBalancerEcsSecurityGroup.GroupId
+
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: TargetGroup
+      LoadBalancerArn:
+        Ref: EcsElasticLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name:
+        Fn::Join:
+        - "-"
+        - - Ref: AWS::StackName
+      Port: 8080
+      Protocol: HTTP
+      VpcId:
+        Ref: Vpc
+    DependsOn:
+    - EcsElasticLoadBalancer
+
+  ServiceApp:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EcsInstanceAsg
+      - DBInstance
+      - EcsCluster
+    Properties:
+      Cluster: 
+        Ref: EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+      TaskDefinition: !Ref AppTaskDefinition
+      LoadBalancers:
+      - ContainerName: app
+        ContainerPort: 8080
+        TargetGroupArn:
+          Ref: TargetGroup
+      Role: !Ref ECSServiceRole
+      DesiredCount: 
+        Ref: InitialECSServiceTaskCount
+
+  ScalableTargetApp:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 
+        Ref: AsgMaxSize
+      MinCapacity: 
+        Ref: AsgMinSize
+      ResourceId: 
+        Fn::Join:
+          - /
+          - - service
+            - Ref: EcsCluster
+            - !GetAtt ServiceApp.Name
+      RoleARN: !GetAtt ApplicationScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  ServiceScaleUpPolicyapp:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: ServiceScaleUpapp
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref ScalableTargetApp
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: 120
+        StepAdjustments:
+          - MetricIntervalLowerBound: 0
+            ScalingAdjustment: 2
+            
+  ServiceScaleDownPolicyapp:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: ServiceScaleDownapp
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref ScalableTargetApp
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: 120
+        StepAdjustments:
+          - MetricIntervalUpperBound: 0
+            ScalingAdjustment: -2
+
+  HostedZoneDNS: 
+    Type: AWS::Route53::HostedZone
+    Properties: 
+      HostedZoneConfig: 
+        Comment: Private hosted zone for the journal app
+      Name:
+        Fn::Join:
+          - ''
+          - - !Ref WebsiteURL
+            - '.'
+      VPCs: 
+        - 
+          VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+
+  RecordSetDNS:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZoneDNS
+      Comment: Zone apex alias targeted to ECS LoadBalancer.
+      RecordSets:
+      - Name:
+          Fn::Join:
+          - ''
+          - - !Ref WebsiteURL
+            - '.'
+        Type: A
+        AliasTarget:
+          HostedZoneId: !GetAtt EcsElasticLoadBalancer.CanonicalHostedZoneID
+          DNSName: !GetAtt EcsElasticLoadBalancer.DNSName
+
+Outputs:
+  ElbURL:
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - !GetAtt EcsElasticLoadBalancer.DNSName
+    Description: crossover-app Website using ELB DNS
+  Route53URL:
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - !Ref WebsiteURL
+    Description: crossover-app Website using Route53 record
+  BashtonServer:
+    Value: !GetAtt BashtonEc2Instance.PublicDnsName
+    Description: Use this server to connect as a baston server for SSH-ing into the ECS instances part of AutoScalingGroup
