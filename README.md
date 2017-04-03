@@ -1,7 +1,12 @@
 # Deploy-Java8-MVN-application-ECS-cluster
 AWS CloudFormation sample that builds and runs a Java8 with Maven application on ECS
 
-# Assumptions
+## Provider
+This tutorial has been provided by [NETBEARS](https://netbears.ro/).
+
+## Stack details
+
+### Assumptions
 1. I wanted to NOT give ECS instances (part of Auto-Scaling group) public IPs, but could not make the ECS agent add instances to the cluster unless they were deployed with a public IP
 2. Because of point 1), all the security measures have been taken using Security Groups, and:
   - All auto-scaling instances have no ports open to the "open-world"
@@ -10,13 +15,13 @@ AWS CloudFormation sample that builds and runs a Java8 with Maven application on
 4. The container image has been predeployed based on the Dockerfile that can be found in Code\application
 5. The policy ARNs are predeployed in the environment and a sample of how they look exactly can be found in Code\Policies
 
-# Design document
+### Design document
   - infrastructure available as a picture in Design\WebAppArchitecture.png
   - explanation and high-levle design as a doc in Design\HighLevelDesign.doc
 
-# Deployment manual
+### Deployment manual
   - available as a .doc in Deployment\DeploymentSteps.doc
 
-# Source code
+### Source code
   - application code is available in Code\application\
   - cloudformation template is available in Code\aws-cloudformation\
