@@ -2,7 +2,7 @@
 AWS CloudFormation sample that builds and runs a Java8 with Maven application on ECS
 
 ## Provider
-This tutorial has been provided by [NETBEARS](https://netbears.ro/).
+The CloudFormation template and explanation is also posted on the [NETBEARS](https://netbears.com/blog/run-java-ecs/) company blog. You might want to check the website out for more tutorials like this.
 
 ## Stack details
 
@@ -25,3 +25,8 @@ This tutorial has been provided by [NETBEARS](https://netbears.ro/).
 ### Source code
   - application code is available in Code\application\
   - cloudformation template is available in Code\aws-cloudformation\
+  
+## Final notes
+Need help implementing this?
+
+Feel free to contact us using [this form](https://netbears.com/#contact-form).
